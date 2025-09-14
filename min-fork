@@ -1,0 +1,60 @@
+#include <iostream>
+#include <vector>
+#include <unistd.h>     // fork, pipe, read, write, getpid
+#include <sys/wait.h>   // wait
+#include <cstdlib>      // srand, rand, EXIT_FAILURE
+#include <ctime>        // time
+#include <climits>      // INT_MAX
+#include <algorithm>    // min
+
+int main() {
+    const int N = 20;
+    std::vector<int> a(N);
+    std::srand(static_cast<unsigned>(std::time(nullptr)));
+    for (int i = 0; i < N; ++i) a[i] = std::rand() % 1000;
+
+    std::cout << "Array (20): ";
+    for (int v : a) std::cout << v << " ";
+    std::cout << "\n";
+
+    int fd[2];
+    if (pipe(fd) == -1) { perror("pipe"); return EXIT_FAILURE; }
+
+    pid_t pid = fork();
+    if (pid < 0) { perror("fork"); return EXIT_FAILURE; }
+
+    if (pid == 0) {
+        // Child: min of indices [10..19], write to pipe
+        close(fd[0]); // child doesn't read
+        int childMin = INT_MAX;
+        for (int i = N/2; i < N; ++i) childMin = std::min(childMin, a[i]);
+
+        std::cout << "[Child]  PID=" << getpid() << " range=[10,19] min=" << childMin << "\n";
+
+        if (write(fd[1], &childMin, sizeof(childMin)) == -1) {
+            perror("write"); close(fd[1]); return EXIT_FAILURE;
+        }
+        close(fd[1]);
+        return 0;
+    } else {
+        // Parent: min of indices [0..9], read from pipe
+        close(fd[1]); // parent doesn't write
+        int parentMin = INT_MAX;
+        for (int i = 0; i < N/2; ++i) parentMin = std::min(parentMin, a[i]);
+
+        std::cout << "[Parent] PID=" << getpid() << " range=[0,9]  min=" << parentMin << "\n";
+
+        int childMin = INT_MAX;
+        if (read(fd[0], &childMin, sizeof(childMin)) == -1) {
+            perror("read"); close(fd[0]); return EXIT_FAILURE;
+        }
+        close(fd[0]);
+        wait(nullptr);
+
+        int overall = std::min(parentMin, childMin);
+        std::cout << "[Result] parentMin=" << parentMin
+                  << " childMin="  << childMin
+                  << " overallMin="<< overall << "\n";
+    }
+    return 0;
+}

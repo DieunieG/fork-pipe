@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'min_with_fork_pipe.cpp'
+      - 'min-fork'
       - '.github/workflows/build-run.yml'
 
 jobs:
@@ -16,7 +16,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
       - name: Build
-        run: g++ -std=c++17 -Wall -Wextra -O2 min_with_fork_pipe.cpp -o minprog
+        # -x c++ tells g++ the input is C++ even though it lacks a .cpp extension
+        run: g++ -x c++ -std=c++17 -Wall -Wextra -O2 min-fork -o minprog
 
       - name: Run
         run: ./minprog | tee output.txt
